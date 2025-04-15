@@ -51,6 +51,7 @@
                 <div class="card-footer text-muted">
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="session-info">Session ID: {{ Session::getId() }}</small>
+                        <small class="session-info" id="session-timer">02:00</small>
                         {{-- <small class="session-info">Started:
                             {{ now()->diffForHumans(\Carbon\Carbon::createFromTimestamp(Session::get('last_activity', time())), true) }}
                             ago
@@ -65,6 +66,64 @@
 @push('scripts')
     <script>
         $(document).ready(function() {
+            // Session timeout set to 2 minutes (120 seconds)
+            const SESSION_LIFETIME = 120;
+            let timeLeft = SESSION_LIFETIME;
+            let warningShown = false;
+            let sessionTimer;
+            let activityTimer;
+
+            // Update the visible timer
+            function updateTimerDisplay() {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                $('#session-timer').text(
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+                );
+            }
+
+            // Start the countdown
+            function startSessionTimer() {
+                clearInterval(sessionTimer);
+                timeLeft = SESSION_LIFETIME;
+                updateTimerDisplay();
+                warningShown = false;
+                $('#session-warning').addClass('d-none');
+
+                sessionTimer = setInterval(() => {
+                    timeLeft--;
+                    updateTimerDisplay();
+
+                    // Show warning at 30 seconds
+                    if (timeLeft <= 30 && !warningShown) {
+                        $('#session-warning').removeClass('d-none');
+                        warningShown = true;
+                    }
+
+                    // End session when time runs out
+                    if (timeLeft <= 0) {
+                        clearInterval(sessionTimer);
+                        alert('Your session has expired due to inactivity.');
+                        window.location.reload();
+                    }
+                }, 1000);
+            }
+
+            // Reset timer on any user activity
+            function resetInactivityTimer() {
+                clearTimeout(activityTimer);
+                activityTimer = setTimeout(() => {
+                    // Optional: You can add additional handling here if needed
+                }, 1000);
+                startSessionTimer();
+            }
+
+            // Set up event listeners for user activity
+            $(document).on('mousemove keydown click scroll', resetInactivityTimer);
+
+            // Initialize the timer
+            startSessionTimer();
+
             // Add new task
             $('#todo-form').on('submit', function(e) {
                 e.preventDefault();
@@ -81,20 +140,14 @@
                         },
                         success: function(response) {
                             if (response.success) {
-                                // Prepend new task to the list
                                 $('#todo-list').prepend(`
-                            <div class="todo-item d-flex justify-content-between align-items-center p-3 border-bottom" data-id="${response.todo.id}">
-                                <span>${response.todo.task}</span>
-                                <button class="btn btn-sm btn-danger delete-btn">×</button>
-                            </div>
-                        `);
+                                <div class="todo-item d-flex justify-content-between align-items-center p-3 border-bottom"
+                                     data-id="${response.todo.id}">
+                                    <span>${response.todo.task}</span>
+                                    <button class="btn btn-sm btn-danger delete-btn">×</button>
+                                </div>
+                            `);
                                 taskInput.val('');
-                            }
-                        },
-                        error: function(xhr) {
-                            if (xhr.status === 401) {
-                                alert('Your session has expired. Page will refresh.');
-                                window.location.reload();
                             }
                         }
                     });
@@ -114,50 +167,9 @@
                     },
                     success: function() {
                         todoItem.remove();
-                    },
-                    error: function(xhr) {
-                        if (xhr.status === 401) {
-                            alert('Your session has expired. Page will refresh.');
-                            window.location.reload();
-                        }
                     }
                 });
             });
-
-            // Session timeout management
-            let sessionWarningTimer;
-            const sessionLifetime = {{ config('session.lifetime') * 60 }}; // in seconds
-            const warningTime = 60; // Show warning 1 minute before expiry
-
-            function startSessionTimer() {
-                clearTimeout(sessionWarningTimer);
-
-                // Set timer to show warning 1 minute before session expires
-                sessionWarningTimer = setTimeout(() => {
-                    if (confirm(
-                            'Your session will expire in 1 minute due to inactivity. Continue session?')) {
-                        // Reset activity by making a request
-                        $.get('/ping');
-                        startSessionTimer(); // Restart the timer
-                    }
-                }, (sessionLifetime - warningTime) * 1000);
-            }
-
-            // Reset timer on user activity
-            $(document).on('mousemove keydown click', function() {
-                startSessionTimer();
-            });
-
-            // Start the timer initially
-            startSessionTimer();
-
-            // Check session status every minute
-            setInterval(() => {
-                $.get('/ping').fail(() => {
-                    alert('Session expired. Page will refresh.');
-                    window.location.reload();
-                });
-            }, 60000);
         });
     </script>
 @endpush
