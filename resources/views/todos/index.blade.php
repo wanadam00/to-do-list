@@ -51,8 +51,10 @@
                 <div class="card-footer text-muted">
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="session-info">Session ID: {{ Session::getId() }}</small>
-                        <small class="session-info">Started:
-                            {{ now()->diffForHumans(Session::get('last_activity', now()), true) }} ago</small>
+                        {{-- <small class="session-info">Started:
+                            {{ now()->diffForHumans(\Carbon\Carbon::createFromTimestamp(Session::get('last_activity', time())), true) }}
+                            ago
+                        </small> --}}
                     </div>
                 </div>
             </div>
@@ -133,7 +135,7 @@
                 // Set timer to show warning 1 minute before session expires
                 sessionWarningTimer = setTimeout(() => {
                     if (confirm(
-                        'Your session will expire in 1 minute due to inactivity. Continue session?')) {
+                            'Your session will expire in 1 minute due to inactivity. Continue session?')) {
                         // Reset activity by making a request
                         $.get('/ping');
                         startSessionTimer(); // Restart the timer
