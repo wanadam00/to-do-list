@@ -170,6 +170,20 @@
                     }
                 });
             });
+            window.addEventListener('beforeunload', function(e) {
+                if (!window.performance || performance.navigation.type !== 1) {
+                    fetch('/nuclear-reset', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                .content
+                        },
+                        body: JSON.stringify({}),
+                        keepalive: true
+                    });
+                }
+            });
         });
     </script>
 @endpush
